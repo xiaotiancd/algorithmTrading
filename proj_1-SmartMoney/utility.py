@@ -17,10 +17,15 @@ import matplotlib.pyplot as plt
         columns: date, open, high, low, close, preClose, preClose2, amount, vwap
         shape: (validate_sample_num, 9)
 """
-def extract_valid_data_range(df, start_date, end_date, filter = True):
+def extract_valid_data_range(df, start_date=None, end_date=None, filter = True):
     data = df
-    valid_data = data.loc[(data['date']>start_date)
-             & (data['date']<=end_date)]
+    if start_date==None:
+        valid_data = data.loc[data['date']<=end_date]
+    elif end_date==None:
+        valid_data = data.loc[data['date']>start_date]
+    else:
+        valid_data = data.loc[(data['date']>start_date)
+                 & (data['date']<=end_date)]
     if filter:
         # filtering those data with nan or null
         valid_data = valid_data.dropna(how='any')
@@ -28,7 +33,7 @@ def extract_valid_data_range(df, start_date, end_date, filter = True):
 
 
 """calculate Smart metric "S"
-    R_t = abs(close-preClose)/preClose*100%
+    R_t = abs(close-open)/preClose*100%
     V_t = amount
     S = |R_t|/sqrt(V_t)
     -----------------------------------
@@ -45,10 +50,15 @@ def extract_valid_data_range(df, start_date, end_date, filter = True):
 """
 def calculate_S(valid_data_filter):
     R_elem1 = 'close'
-    R_elem2 = 'preClose'
+    R_elem2 = 'open'
     V_elem = 'amount'
-    R = abs(valid_data_filter[R_elem1]-valid_data_filter[R_elem2])/(valid_data_filter[R_elem2]+np.finfo(float).eps)*100
+    # R = abs(valid_data_filter[R_elem1]-valid_data_filter[R_elem2])/(valid_data_filter[R_elem2]+np.finfo(float).eps)*100
+    # """ -- References - https://uqer.io/community/share/578f04e0228e5b3b9b5f1ab7
+    R = abs(valid_data_filter[R_elem1].pct_change())*100
+    R[np.isnan(R)] = 0
+    # """
     S = R/(np.sqrt(valid_data_filter[V_elem])+np.finfo(float).eps)
+    # print S
     return S
 
 """calculate emotional factor "Q"
@@ -72,13 +82,13 @@ def calculate_Q(valid_data_filter, S, trade_cum_ratio = 0.2):
     S_arr = S.values[S_sort_ids[::-1]]
     sort_valid_data = valid_data_filter.iloc[S_sort_ids[::-1]]
 
-    #成交量的累积占比
+    # The cumulative percentage of amount.
     trade_cum_ratio = 0.2
     amount_cumsum = sort_valid_data['amount'].cumsum()
     all_amount_cumsum = amount_cumsum.values[-1]
     smart_ids = np.where((amount_cumsum.values/all_amount_cumsum) <= trade_cum_ratio)[0]
 
-    # 聪明钱的情绪因子Q
+    # Smart money emotional factor "Q"
     # Q = VWAP_smart/VWAP_all
     trade_mon = sort_valid_data['amount'].values * sort_valid_data['vwap'].values
     VWAP_smart = np.sum(trade_mon[smart_ids])/np.sum(sort_valid_data['amount'].values[smart_ids])
@@ -86,6 +96,11 @@ def calculate_Q(valid_data_filter, S, trade_cum_ratio = 0.2):
     Q = VWAP_smart/VWAP_all
     print "VWAP_smart:", VWAP_smart, ", VWAP_all:", VWAP_all
     print "Q:", Q
+    return Q
+
+def smart_money_Q(valid_data_filter, trade_cum_ratio = 0.2):
+    S = calculate_S(valid_data_filter)
+    Q = calculate_Q(valid_data_filter, S, trade_cum_ratio)
     return Q
 
 def visualize_S(sort_valid_data, trade_cum_ratio = 0.2):
