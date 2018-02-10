@@ -52,10 +52,10 @@ def calculate_S(valid_data_filter):
     R_elem1 = 'close'
     R_elem2 = 'open'
     V_elem = 'amount'
-    # R = abs(valid_data_filter[R_elem1]-valid_data_filter[R_elem2])/(valid_data_filter[R_elem2]+np.finfo(float).eps)*100
+    R = abs(valid_data_filter[R_elem1]-valid_data_filter[R_elem2])/(valid_data_filter[R_elem2]+np.finfo(float).eps)*100
     # """ -- References - https://uqer.io/community/share/578f04e0228e5b3b9b5f1ab7
-    R = abs(valid_data_filter[R_elem1].pct_change())*100
-    R[np.isnan(R)] = 0
+    # R = abs(valid_data_filter[R_elem1].pct_change())*100
+    # R[np.isnan(R)] = 0
     # """
     S = R/(np.sqrt(valid_data_filter[V_elem])+np.finfo(float).eps)
     # print S
