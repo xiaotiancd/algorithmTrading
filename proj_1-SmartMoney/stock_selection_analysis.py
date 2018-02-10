@@ -175,6 +175,81 @@ def visualize_RankICs(RankICs, date_set):
     print u"RankIC negative num:", len(RankICs_neg) if type(RankICs_neg)==np.ndarray else RankICs_neg
     print u"RankIC non-salient num:", len(RankICs) - len(RankICs_pos) - len(RankICs_neg)
 
+u"""分组表现与多空对冲净值"""
+def statics_group_return(Astock_Q, Astock_profits, group_num = 5):
+    print "group num:", group_num
+    print "Astock_Q.shape:", Astock_Q.shape
+    print "Astock_Q_ids.shape:", Astock_Q_ids.shape
+    Astock_Q_ids = np.argsort(Astock_Q, axis=0)
+
+    group_profit = []
+    for group_item in xrange(group_num):
+        begin_ids = int(group_item * (Astock_Q_ids.shape[0] * 1.0/group_num))
+        end_ids = int(begin_ids + (Astock_Q_ids.shape[0] * 1.0/group_num))
+        profit_group_item = np.array([])
+        for mon_item in xrange(Astock_Q_ids.shape[1]-1):
+            if profit_group_item.size == 0:
+                profit_group_item = Astock_profits[Astock_Q_ids[begin_ids:end_ids, mon_item], mon_item+1][:,np.newaxis]
+            else:
+                profit_group_item = np.hstack((profit_group_item
+                                               , Astock_profits[Astock_Q_ids[begin_ids:end_ids,mon_item], mon_item+1][:,np.newaxis]))
+    group_profit.append(profit_group_item)
+    print group_profit[group_item].shape
+    return group_profit
+
+u"""分组表现与多空对冲净值曲线"""
+def visualize_group_return(group_profit, date_set):
+    group_curve = np.array([])
+    date_indexes = pd.to_datetime(date_set[:-1])
+    for item in xrange(group_num):
+        curve = np.mean(group_profit[item], axis=0)[:, np.newaxis]
+    #     print curve.shape
+        if group_curve.size == 0:
+            group_curve = curve
+        else:
+            group_curve = np.hstack((group_curve, curve))
+    print "group_curve.shape:", group_curve.shape
+    curve_data = pd.DataFrame(group_curve, index=date_indexes, columns=['group 1','group 2'
+                                                                         ,'group 3','group 4','group 5'])
+    curve_data = curve_data.cumsum()
+
+    fig = plt.figure()
+    ax = curve_data.plot()
+
+    ax2 = ax.twinx()
+    g1_g5_diff = curve_data['group 1'] - curve_data['group 5']
+    print ax.get_xticks()
+    ax2.plot(date_indexes, g1_g5_diff, 'k--')
+
+    ax.grid(True)
+    plt.show()
+    return group_curve
+
+
+u"""分组相对于市场平均收益的超额收益（月度均值）"""
+def visualize_group_excess_return(group_curve, Astock_profits):
+    print "group_curve.shape:", group_curve.shape
+    print "Astock_profits.shape:", Astock_profits[:,1:].shape
+    all_mkt_mon_mean = np.mean(Astock_profits[:,1:], axis = 0)
+    print "mean_group_curve.shape:", group_curve.shape
+    print "all_mkt_mon_mean.shape:", all_mkt_mon_mean.shape
+    group_profits_rt = np.array([])
+    for group_item in xrange(group_num):
+        group_profits_item = np.divide(group_curve[:, group_item] - all_mkt_mon_mean, abs(all_mkt_mon_mean))*100.0
+        if group_profits_rt.size == 0:
+            group_profits_rt = group_profits_item[:,np.newaxis]
+        else:
+            group_profits_rt = np.hstack((group_profits_rt, group_profits_item[:,np.newaxis]))
+    print group_profits_rt.shape
+    group_profits_rt = np.mean(group_profits_rt, axis=0)
+
+    show_group_profits_rt = pd.DataFrame(group_profits_rt, index=['group 1','group 2'
+                                                   ,'group 3','group 4','group 5'], columns=['Excess returns'])
+    ax = show_group_profits_rt.plot(kind='bar')
+    ax.grid(True)
+    plt.show()
+    return group_profits_rt
+
 if __name__ == '__main__':
     feather_path = r'/Volumes/Seagate Backup Plus Drive/workspace/1m data/1/Q_and_Profits_2'
     feat_names = init_preprocessing_data_path(feather_path)
@@ -188,3 +263,9 @@ if __name__ == '__main__':
     stock_date_path = '/Users/bowen/workspace/Quant/algorithmTrading/proj_1-SmartMoney/stock_date'
     date_set = generate_date_set(stock_date_path, data_mon_group)
     visualize_RankICs(rankICs, date_set)
+
+    u"""分组表现与多空对冲净值曲线 & 分组相对于市场平均收益的超额收益（月度均值）"""
+    group_num = 5
+    group_profit = statics_group_return(Astock_Q, Astock_profits, group_num)
+    group_curve = visualize_group_return(group_profit, date_set)
+    group_profits_rt = visualize_group_excess_return(group_curve, Astock_profits)
